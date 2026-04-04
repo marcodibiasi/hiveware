@@ -1,0 +1,3 @@
+/home/caroline/Desktop/Projects/hiveware/build/CMakeFiles/hiwa.dir
+/home/caroline/Desktop/Projects/hiveware/build/CMakeFiles/edit_cache.dir
+/home/caroline/Desktop/Projects/hiveware/build/CMakeFiles/rebuild_cache.dir

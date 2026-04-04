@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/hiwa.dir/src/main.c.o CMakeFiles/hiwa.dir/src/node/node.c.o -o hiwa  -lpthread 
