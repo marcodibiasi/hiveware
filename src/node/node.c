@@ -8,16 +8,44 @@
 #include <pthread.h>
 #include "node.h"
 
-Node setup_node(uint16_t hello_port, uint16_t connection_port, char* hello_multicast) {    
+void exit_error(char* msg){
+    fprintf(stderr, "%s", msg);
+    exit(EXIT_FAILURE);
+}
+
+
+NodeConfig default_nodeconfig() {
+    NodeConfig c; 
+    strcpy(c.h_multicast, "239.255.0.1");
+    c.h_port = 50000;
+    c.c_port = 50001;
+    c.heartbeat_ms = 2000;
+    c.timeout_ms = 8000;
+
+    printf("default nodeconfig created: \nh_port: %d" 
+            "\nc_port: %d \nh_multicast: %s"
+            "\nheartbeat_ms = %d \ntimeout_ms = %d\n",
+            c.h_port, c.c_port, c.h_multicast, c. heartbeat_ms, c.timeout_ms);
+
+    return c;
+}
+
+
+Node init_node(const NodeConfig* config) {    
     Node n;
-    n.h_port = hello_port;
-    n.c_port = connection_port;
-    strncpy(n.h_multicast, hello_multicast, INET_ADDRSTRLEN);
-    n.h_multicast[INET_ADDRSTRLEN - 1] = '\0';
+    n.config = config; 
+    
+    if((n.h_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) 
+        exit_error("h_socket");  
 
-    printf("setup_node successfull: \nh_port: %d \nc_port: %d \nh_multicast: %s\n",
-            n.h_port, n.c_port, n.h_multicast);
-
+    if((n.c_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) 
+        exit_error("h_socket");  
+  
+    printf("socket created successfully\n");
     return n;
-} 
+}
 
+
+void* heartbeat_hello(void* arg) {
+    return NULL;
+}

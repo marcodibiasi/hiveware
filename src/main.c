@@ -3,7 +3,8 @@
 #include "node.h"
 
 int main(int arg, char* argv[]) {
-    setup_node(50000, 50001, "239.1.1.1");
+    NodeConfig config = default_nodeconfig();
+    init_node(&config);
 
     printf("\nWork in progress...\n");
     return EXIT_SUCCESS;

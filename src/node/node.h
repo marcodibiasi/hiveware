@@ -11,12 +11,24 @@ c_port is a TCP port to ensure the connection to the peers after the discovery.
 h_multicast is a multicast ip used to send a HELLO message to the LAN. 
 */
 
-typedef struct node{
-    uint16_t h_port;
-    uint16_t c_port;
+typedef struct {
     char h_multicast[INET_ADDRSTRLEN];
+    uint16_t h_port; 
+    uint16_t c_port;
+
+    uint32_t heartbeat_ms; 
+    uint32_t timeout_ms; 
+} NodeConfig;
+
+typedef struct {
+    const NodeConfig *config;
+    int h_socket;
+    int c_socket;
 } Node;
 
-Node setup_node(uint16_t hello_port, uint16_t connection_port, char* hello_multicast);
+void exit_error(char* msg);
+NodeConfig default_nodeconfig();
+Node init_node(const NodeConfig* config);
+void* heartbeat_hello(void* arg);
 
 #endif // NODE_H
