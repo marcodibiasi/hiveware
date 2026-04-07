@@ -7,14 +7,9 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include "node.h"
+#include "utils.h"
 
-void exit_error(char* msg){
-    fprintf(stderr, "%s", msg);
-    exit(EXIT_FAILURE);
-}
-
-
-NodeConfig default_nodeconfig() {
+NodeConfig default_nodeconfig(void) {
     NodeConfig c; 
     strcpy(c.h_multicast, "239.255.0.1");
     c.h_port = 50000;
@@ -34,18 +29,38 @@ NodeConfig default_nodeconfig() {
 Node init_node(const NodeConfig* config) {    
     Node n;
     n.config = config; 
-    
-    if((n.h_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) 
-        exit_error("h_socket");  
 
-    if((n.c_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) 
-        exit_error("h_socket");  
-  
-    printf("socket created successfully\n");
+	init_h_socket(&n);
+    
     return n;
 }
 
 
-void* heartbeat_hello(void* arg) {
-    return NULL;
+void init_h_socket(Node *n){
+
+	if((n->h_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
+        exit_error("h_socket");  
+
+	int opt = 1;
+	if(setsockopt(n->h_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) < 0)
+		exit_error("setsockopt SO_REUSEADDR");
+
+	// BIND
+	struct sockaddr_in addr = {0};
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(n->config->h_port);
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	
+	if(bind(n->h_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
+		exit_error("h_socket bind"); 
+
+	// JOIN MULTICAST 
+	struct ip_mreq mreq;
+	inet_pton(AF_INET, n->config->h_multicast, &mreq.imr_multiaddr); 
+	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	
+	if(setsockopt(n->h_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) 
+		exit_error("setsockopt IP_ADD_MEMBERSHIP");
+
+	printf("h_socket created successfully");
 }

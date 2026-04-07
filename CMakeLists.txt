@@ -10,6 +10,7 @@ add_compile_options(-Wno-error)
 set(SRC
     src/main.c
     src/node/node.c
+    src/utils/utils.c
 )
 
 # --- EXECUTABLE ---
@@ -19,6 +20,7 @@ add_executable(hiwa ${SRC})
 target_include_directories(hiwa PRIVATE
     src
     src/node
+    src/utils
 )
 
 # --- WARNING ---
