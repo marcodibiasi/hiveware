@@ -2,35 +2,38 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "peer_disc.h"
+#include "../utils/utils.h"
+
 
 uint8_t peer_add(PeerDiscovery* Peer_table, uint8_t* mac_address){
 
     if(!Peer_table){
-        fprintf(stderr,"Peer table empty");
+        exit_error("Peer table is empty");
         return 1;
     }
 
-    if(!mac_address && sizeof(mac_address) < 6){
-        fprintf(stderr, "Mac address does not exist or length is less than 6 bytes");
+    if(!mac_address){
+        exit_error("Mac address does not exist or length is less than 6 bytes");
         return 2;
     }
 
     for(int i = 0; i<MAX_PEERS; i++){
         /*If we find an empty node, we just add the mac_address and change the boolean flag to True*/
-        if(Peer_table -> Node.is_empty)
+        if(Peer_table -> Node[i].is_empty)
             {
-                Peer_table -> Node.is_empty = false;
-                for(int j = 0; j<6; j++){
-                    Peer_table-> Node.mac_address[j] = mac_address[j];
-                }
+                Peer_table -> Node[i].is_empty = false;
+                memcpy(Peer_table->Node[i].mac_address,mac_address,6);
+                return 0;
             }
-
-    }   
+        }
+   
+    return 3; /*No peers available*/
 
 }
 
-void peer_remove(PeerDiscovery* Peer_table, uint8_t* mac_address){
+uint8_t peer_remove(PeerDiscovery* Peer_table, uint8_t* mac_address){
     
     if(!Peer_table){
         fprintf(stderr,"Peer table empty");
@@ -44,10 +47,12 @@ void peer_remove(PeerDiscovery* Peer_table, uint8_t* mac_address){
 
     for(int i = 0; i<MAX_PEERS; i++){
         /*If we find an empty node, we just add the mac_address and change the boolean flag to True*/
-        if(Peer_table -> Node.is_empty)
+        if(mac_compare(Peer_table -> Node[i].mac_address, mac_address)) /*If true, just remove it*/
             {
-                Peer_table -> Node.is_empty = true;
+                Peer_table -> Node[i].is_empty = true;
+                return 0; /*Found !*/
             }
 
-    }   
+    }
+    return 3; /*Mac address not found*/   
 }

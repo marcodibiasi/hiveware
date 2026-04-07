@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include "../node/node.h"
 
 
@@ -21,11 +22,11 @@ typedef struct Disc_Node{
 
 typedef struct Peer_Discovery{
     
-    DiscNode Node; /*disc_node*/
+    DiscNode Node[MAX_PEERS]; /*disc_node*/
 
 }PeerDiscovery;
 
-void peer_add(PeerDiscovery* Peer_table, uint8_t* mac_address); /*This function adds a peer in the discovery_table*/
-void peer_remove(PeerDiscovery* Peer_table, uint8_t* mac_address); /*This function removes a peer in the discovery table*/
+uint8_t peer_add(PeerDiscovery* Peer_table, uint8_t* mac_address); /*This function adds a peer in the discovery_table*/
+uint8_t peer_remove(PeerDiscovery* Peer_table, uint8_t* mac_address); /*This function removes a peer in the discovery table*/
 
 #endif
