@@ -11,6 +11,8 @@ set(SRC
     src/main.c
     src/node/node.c
     src/peer_disc_table/peer_disc.c
+    src/utils/utils.c
+
 )
 
 # --- EXECUTABLE ---
@@ -20,7 +22,11 @@ add_executable(hiwa ${SRC})
 target_include_directories(hiwa PRIVATE
     src
     src/node
+<<<<<<< HEAD
     src/peer_disc_table
+=======
+    src/utils
+>>>>>>> c43ac7ad763e81ff16789a2507585c79790fcdfa
 )
 
 # --- WARNING ---

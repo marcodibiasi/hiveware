@@ -12,11 +12,11 @@ h_multicast is a multicast ip used to send a HELLO message to the LAN.
 */
 
 typedef struct {
-    char h_multicast[INET_ADDRSTRLEN]; /*h_multicast is a multicast ip used to send a HELLO message to the LAN. */
-    uint16_t h_port;  /*h_port is a UDP port for the HELLO phase. */
-    uint16_t c_port; /*c_port is a TCP port to ensure the connection to the peers after the discovery.*/
+    char h_multicast[INET_ADDRSTRLEN];  /*h_multicast is a multicast ip used to send a HELLO message to the LAN. */
+    uint16_t h_port; 			        /*h_port is a UDP port for the HELLO phase. */
+	uint16_t c_port; 			        /*c_port is a TCP port to ensure the connection to the peers after the discovery.*/
 
-    uint32_t heartbeat_ms; 
+    uint32_t heartbeat_ms;             
     uint32_t timeout_ms; 
 } NodeConfig;
 
@@ -26,9 +26,8 @@ typedef struct {
     int c_socket;
 } Node;
 
-void exit_error(char* msg);
-NodeConfig default_nodeconfig();
+NodeConfig default_nodeconfig(void);
 Node init_node(const NodeConfig* config);
-void* heartbeat_hello(void* arg);
+void init_h_socket(Node* n);
 
 #endif // NODE_H
