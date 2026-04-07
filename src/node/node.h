@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <netinet/in.h>
+#include <stdatomic.h>
 
 /*
 Node stores the execution variables to setup before running the nodes. 
@@ -24,10 +25,15 @@ typedef struct {
     const NodeConfig *config;
     int h_socket;
     int c_socket;
+
+    atomic_bool hello_t_running; 
 } Node;
 
 NodeConfig default_nodeconfig(void);
 Node init_node(const NodeConfig* config);
 void init_h_socket(Node* n);
+void hello_handler(Node* n);
+void* send_hello(void* arg);
+void* recv_hello(void* arg);
 
 #endif // NODE_H

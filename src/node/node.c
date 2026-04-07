@@ -6,6 +6,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <stdatomic.h>
+#include <stdbool.h>
 #include "node.h"
 #include "utils.h"
 
@@ -29,6 +31,7 @@ NodeConfig default_nodeconfig(void) {
 Node init_node(const NodeConfig* config) {    
     Node n;
     n.config = config; 
+	atomic_init(&n.hello_t_running, false);
 
 	init_h_socket(&n);
     
@@ -62,5 +65,43 @@ void init_h_socket(Node *n){
 	if(setsockopt(n->h_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) 
 		exit_error("setsockopt IP_ADD_MEMBERSHIP");
 
-	printf("h_socket created successfully");
+	printf("h_socket created successfully\n");
+}
+
+
+void hello_handler(Node* n){
+	atomic_store(&n->hello_t_running, true);
+
+	pthread_t h_send, h_recv; 
+
+	if(pthread_create(&h_send, NULL, send_hello, (void*)n) != 0)
+		exit_error("pthread_create h_send");	
+	if(pthread_create(&h_recv, NULL, recv_hello, (void*)n) != 0)
+		exit_error("pthread_create h_recv");
+	
+
+	/* TODO:
+	shutdown logic
+	unlock recv with shutdown(n->h_socket, SHUT_RDWR);
+	*/
+
+
+	if(pthread_join(h_send, NULL) != 0)
+		exit_error("pthread_join h_send");
+	if(pthread_join(h_recv, NULL) != 0)
+		exit_error("pthread_join h_recv");
+}
+
+
+void* send_hello(void* arg){
+	Node *n = (Node*)arg;
+
+	while(atomic_load(&n->hello_t_running)){
+		// LOGIC
+	}
+}
+
+
+void* recv_hello(void* arg){
+	Node *n = (Node*)arg;
 }

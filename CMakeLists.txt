@@ -10,9 +10,7 @@ add_compile_options(-Wno-error)
 set(SRC
     src/main.c
     src/node/node.c
-    src/peer_disc_table/peer_disc.c
     src/utils/utils.c
-
 )
 
 # --- EXECUTABLE ---
@@ -22,9 +20,7 @@ add_executable(hiwa ${SRC})
 target_include_directories(hiwa PRIVATE
     src
     src/node
-    src/peer_disc_table
     src/utils
-
 )
 
 # --- WARNING ---
