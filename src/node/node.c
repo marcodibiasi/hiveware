@@ -95,6 +95,7 @@ void hello_handler(Node* n){
 
 void* send_hello(void* arg){
 	Node *n = (Node*)arg;
+	Message msg; 	
 
 	while(atomic_load(&n->hello_t_running)){
 		// LOGIC
