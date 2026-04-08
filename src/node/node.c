@@ -99,6 +99,7 @@ void* send_hello(void* arg){
 
 	while(atomic_load(&n->hello_t_running)){
 		// LOGIC
+
 	}
 
 	return NULL;

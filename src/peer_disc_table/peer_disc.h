@@ -23,5 +23,6 @@ typedef struct Peer_Discovery{
 
 uint8_t peer_add(PeerDiscovery* peer_table, uint8_t* mac_address); /*This function adds a peer in the discovery_table*/
 uint8_t peer_remove(PeerDiscovery* peer_table, uint8_t* mac_address); /*This function removes a peer in the discovery table*/
+void peer_timers_increase(PeerDiscovery* peer_table, void* arg);
 
 #endif

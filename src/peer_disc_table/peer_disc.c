@@ -56,3 +56,12 @@ uint8_t peer_remove(PeerDiscovery* peer_table, uint8_t* mac_address){
     }
     return 3; /*Mac address not found*/   
 }
+
+void peer_timers_increase(PeerDiscovery* peer_table, void* arg){
+
+    while(true){
+        for(int i = 0; i<MAX_PEERS; i++)
+            peer_table->Node[i].timer -= 1;
+    }
+
+}
