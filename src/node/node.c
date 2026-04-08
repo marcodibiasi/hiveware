@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
+#include <time.h>
 #include "node.h"
 #include "utils.h"
 
@@ -96,10 +97,21 @@ void hello_handler(Node* n){
 void* send_hello(void* arg){
 	Node *n = (Node*)arg;
 	Message msg; 	
+    msg.type = HELLO;
+    
+    // sending multicast address 
+    struct sockaddr_in mcast_addr = {0};
+    mcast_addr.sin_family = AF_INET;
+    mcast_addr.sin_port = htons(n->config->h_port);
+    inet_pton(AF_INET, n->config->h_multicast, &mcast_addr.sin_addr);
+
+    // setting up the time spec (conversion from ms) 
+    struct timespec ts; 
+    ts.tv_sec = n->config->heartbeat_ms / 1000;
+    ts.tv_nsec = (n->config->heartbeat_ms % 1000) * 1000000;
 
 	while(atomic_load(&n->hello_t_running)){
-		// LOGIC
-
+		
 	}
 
 	return NULL;

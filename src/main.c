@@ -4,7 +4,9 @@
 
 int main(int arg, char* argv[]) {
     NodeConfig config = default_nodeconfig();
-    init_node(&config);
+    Node n = init_node(&config);
+    
+    hello_handler(&n);
 
     printf("\nWork in progress...\n");
     return EXIT_SUCCESS;
