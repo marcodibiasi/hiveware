@@ -9,6 +9,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <time.h>
+#include <uuid/uuid.h>
 #include "node.h"
 #include "utils.h"
 
@@ -32,10 +33,12 @@ NodeConfig default_nodeconfig(void) {
 Node init_node(const NodeConfig* config) {    
     Node n;
     n.config = config; 
-	atomic_init(&n.hello_t_running, false);
+	uuid_generate_random(n.id);
+    atomic_init(&n.hello_t_running, false);
 
 	init_h_socket(&n);
-    
+
+    print_uuid(n.id);
     return n;
 }
 
@@ -98,6 +101,7 @@ void* send_hello(void* arg){
 	Node *n = (Node*)arg;
 	Message msg; 	
     msg.type = HELLO;
+    memcpy(msg.node_id, n->id, sizeof(uuid_t));
     
     // sending multicast address 
     struct sockaddr_in mcast_addr = {0};
@@ -111,7 +115,11 @@ void* send_hello(void* arg){
     ts.tv_nsec = (n->config->heartbeat_ms % 1000) * 1000000;
 
 	while(atomic_load(&n->hello_t_running)){
-		
+        sendto(n->h_socket, &msg, sizeof(msg), 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
+        printf("HELLO: ");
+        print_uuid(msg.node_id);
+
+        nanosleep(&ts, NULL);
 	}
 
 	return NULL;
@@ -120,6 +128,21 @@ void* send_hello(void* arg){
 
 void* recv_hello(void* arg){
 	Node *n = (Node*)arg;
+    Message msg;
+        
+    while(atomic_load(&n->hello_t_running)){
+        struct sockaddr_in src_addr;
+        socklen_t addr_len;
+
+        ssize_t msg_size = recvfrom(n->h_socket, &msg, sizeof(msg), 0, 
+                (struct sockaddr*)&src_addr, &addr_len);
+        if(msg_size == 0) {
+            perror("recvfrom");
+            continue;
+        }
+
+        print_uuid(msg.node_id);
+    }
 
 	return NULL;
 }
