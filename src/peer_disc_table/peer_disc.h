@@ -28,10 +28,12 @@ typedef struct PeerDiscovery{
 
 }PeerDiscovery;
 
-void update_client_timer(PeerDiscovery* peer_table); /*Updates timer for each client using cpu clocks*/
+void update_client_timer(DiscNode* Node); /*Updates timer for each client using cpu clocks*/
 
+PeerDiscovery* peer_discovery_init(); /*Initialize peer_discovery table*/
+void peer_discovery_destroy(PeerDiscovery* peer_table); /*Destroy peer table*/
 uint8_t peer_add(PeerDiscovery* peer_table, uuid_t node_id); /*This function adds a peer in the discovery_table*/
 uint8_t peer_remove(PeerDiscovery* peer_table, uuid_t node_id); /*This function removes a peer in the discovery table*/
-void peer_daemon(PeerDiscovery* peer_table, void* arg); /*This function removes peers that do not send the HELLO message*/
+void *peer_daemon(void* arg); /*This function removes peers that do not send the HELLO message*/
 
 #endif
