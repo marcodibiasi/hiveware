@@ -34,3 +34,8 @@ target_compile_options(hiwa PRIVATE
 
 # --- LIBRARIES ---
 target_link_libraries(hiwa pthread)
+
+find_library(UUID_LIB uuid)
+if(UUID_LIB)
+    target_link_libraries(hiwa ${UUID_LIB})
+endif()

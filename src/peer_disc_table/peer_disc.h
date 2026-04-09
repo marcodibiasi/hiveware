@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <uuid/uuid.h>
 #include "node.h"
 
 
@@ -12,16 +13,16 @@
 
 
 typedef struct Disc_Node{
-    bool is_empty; /*This boolean flag tells us if the node is empty or not: False if it is not empty, True otherwise*/
-    uint8_t mac_address[6]; /*mac address is 6 bytes long.*/
+    bool is_empty;      // This boolean flag tells us if the slot is empty or not
+    uuid_t node_id;     // Unique 128bit id; uuid v4
 }DiscNode;
 
 
-typedef struct Peer_Discovery{
+typedef struct PeerDiscovery{
     DiscNode Node[MAX_PEERS]; /*disc_node*/
 }PeerDiscovery;
 
-uint8_t peer_add(PeerDiscovery* peer_table, uint8_t* mac_address); /*This function adds a peer in the discovery_table*/
-uint8_t peer_remove(PeerDiscovery* peer_table, uint8_t* mac_address); /*This function removes a peer in the discovery table*/
+uint8_t peer_add(PeerDiscovery* peer_table, uuid_t node_id); /*This function adds a peer in the discovery_table*/
+uint8_t peer_remove(PeerDiscovery* peer_table, uuid_t node_id); /*This function removes a peer in the discovery table*/
 
 #endif
