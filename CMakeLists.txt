@@ -10,6 +10,8 @@ add_compile_options(-Wno-error)
 set(SRC
     src/main.c
     src/node/node.c
+    src/utils/utils.c
+	src/peer_disc_table/peer_disc.c
 )
 
 # --- EXECUTABLE ---
@@ -19,6 +21,8 @@ add_executable(hiwa ${SRC})
 target_include_directories(hiwa PRIVATE
     src
     src/node
+    src/utils
+	src/peer_disc_table
 )
 
 # --- WARNING ---
@@ -30,3 +34,8 @@ target_compile_options(hiwa PRIVATE
 
 # --- LIBRARIES ---
 target_link_libraries(hiwa pthread)
+
+find_library(UUID_LIB uuid)
+if(UUID_LIB)
+    target_link_libraries(hiwa ${UUID_LIB})
+endif()
