@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <stdatomic.h>
 #include <uuid/uuid.h>
+#include "peer_disc.h" 
 
 /*
 Node stores the execution variables to setup before running the nodes. 
@@ -28,8 +29,9 @@ typedef struct {
 
 typedef struct {
     uuid_t id;  // uuid v4 128bit identifier
-    
-    const NodeConfig *config;
+    PeerDiscovery* peer_table;    
+
+    const NodeConfig* config;
     int h_socket;
     int c_socket;
 

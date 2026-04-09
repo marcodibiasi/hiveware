@@ -12,6 +12,7 @@
 #include <uuid/uuid.h>
 #include "node.h"
 #include "utils.h"
+#include "peer_disc.h"
 
 NodeConfig default_nodeconfig(void) {
     NodeConfig c; 
@@ -35,6 +36,7 @@ Node init_node(const NodeConfig* config) {
     n.config = config; 
 	uuid_generate_random(n.id);
     atomic_init(&n.hello_t_running, false);
+    n.peer_table = peer_discovery_init(config->timeout_ms);
 
 	init_h_socket(&n);
 
@@ -116,8 +118,8 @@ void* send_hello(void* arg){
 
 	while(atomic_load(&n->hello_t_running)){
         sendto(n->h_socket, &msg, sizeof(msg), 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
-        printf("HELLO: ");
-        print_uuid(msg.node_id);
+        // printf("HELLO: ");
+        // print_uuid(msg.node_id);
 
         nanosleep(&ts, NULL);
 	}
@@ -140,7 +142,8 @@ void* recv_hello(void* arg){
             perror("recvfrom");
             continue;
         }
-
+        
+        printf("HELLO from: ");
         print_uuid(msg.node_id);
     }
 
