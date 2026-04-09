@@ -128,6 +128,21 @@ void* send_hello(void* arg){
 
 void* recv_hello(void* arg){
 	Node *n = (Node*)arg;
+    Message msg;
+        
+    while(atomic_load(&n->hello_t_running)){
+        struct sockaddr_in src_addr;
+        socklen_t addr_len;
+
+        ssize_t msg_size = recvfrom(n->h_socket, &msg, sizeof(msg), 0, 
+                (struct sockaddr*)&src_addr, &addr_len);
+        if(msg_size == 0) {
+            perror("recvfrom");
+            continue;
+        }
+
+        print_uuid(msg.node_id);
+    }
 
 	return NULL;
 }
