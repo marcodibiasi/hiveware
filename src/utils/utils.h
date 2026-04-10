@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <uuid/uuid.h>
+#include <time.h>
 
 void exit_error(char* msg);
 void print_uuid(uuid_t id);

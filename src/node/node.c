@@ -52,6 +52,8 @@ void init_h_socket(Node *receiver){
 	int opt = 1;
 	if(setsockopt(receiver->h_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) < 0)
 		exit_error("setsockopt SO_REUSEADDR");
+    if(setsockopt(receiver->h_socket, SOL_SOCKET, SO_REUSEPORT, (char*)&opt, sizeof(opt)) < 0)
+        exit_error("setsockopt SO_REUSEPORT");
 
 	// BIND
 	struct sockaddr_in addr = {0};

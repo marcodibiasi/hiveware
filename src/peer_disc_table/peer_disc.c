@@ -171,16 +171,15 @@ void print_peer_table(PeerDiscovery pt){
 
         char uuid_str[37];
         char addr_str[32];
-        double last_hello;
+        // double last_hello = timespec_to_double(&pt.Node[i].last_hello);
 
         uuid_unparse(pt.Node[i].node_id, uuid_str);
         addr_to_string(&pt.Node[i].addr, addr_str);
-        last_hello = timespec_to_double(&pt.Node[i].elapsed);
 
         printf("| %-36s | %-16s | %-17.3f s |\n",
                uuid_str,
                addr_str,
-               pt.Node[i]. elapsed);
+               pt.Node[i].elapsed / 1e3);
     }
 
     printf("+--------------------------------------+------------------+---------------------+\n");
