@@ -42,10 +42,25 @@ void peer_discovery_destroy(PeerDiscovery* peer_table){
     free(peer_table);
 }
 
+int is_inside(PeerDiscovery* peer_table, uuid_t node_id){
+        for(int i = 0; i<MAX_PEERS;i++){
+            if(memcmp(peer_table -> Node[i].node_id, node_id,sizeof(uuid_t)) == 0){
+                return i;
+            }
+        }
+        return -1;
+}
 
 int peer_add(PeerDiscovery* peer_table, uuid_t node_id){
     if(!peer_table)
         exit_error("peer_table does not exist");
+
+    int index = is_inside(peer_table,node_id);
+
+    if(index != -1){
+        update_client_timer(&peer_table->Node[index]);
+        return index;
+    }
 
     for(int i = 0; i<MAX_PEERS; i++){
         /*If we find an empty node, we just add the mac_address and change the boolean flag to True*/
@@ -54,7 +69,8 @@ int peer_add(PeerDiscovery* peer_table, uuid_t node_id){
             peer_table->Node[i].is_empty = false;
             pthread_mutex_unlock(&peer_table -> Node[i].lock_empty);
             memcpy(peer_table->Node[i].node_id, node_id, sizeof(uuid_t));
-            return 0; // success
+            update_client_timer(&peer_table->Node[i]);
+            return i; // success
         }
         pthread_mutex_unlock(&peer_table -> Node[i].lock_empty);
     }
@@ -106,8 +122,13 @@ void* peer_daemon(void* arg){
             double elapsed =
                 (now.tv_sec - peer_table -> Node[i].last_hello.tv_sec) * 1e3 +
                 (now.tv_nsec - peer_table -> Node[i].last_hello.tv_nsec) / 1e6;
+            printf("sec_diff: %ld, nsec_diff: %ld, elapsed: %lf ms\n",
+            (long)(now.tv_sec - peer_table->Node[i].last_hello.tv_sec),
+            (now.tv_nsec - peer_table->Node[i].last_hello.tv_nsec),
+                elapsed);
 
             if (elapsed > peer_table->timeout){
+                printf("%lf",elapsed);
                 printf("Client expired, node number %d has been removed\n",i);
                 
                 // Remove node

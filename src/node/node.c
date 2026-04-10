@@ -24,7 +24,7 @@ NodeConfig default_nodeconfig(void) {
 
     printf("default nodeconfig created: \nh_port: %d" 
             "\nc_port: %d \nh_multicast: %s"
-            "\nheartbeat_ms = %d \ntimeout_ms = %d\n",
+            "\nheartbeat_ms = %d \ntimeout_ms = %d\receiver",
             c.h_port, c.c_port, c.h_multicast, c. heartbeat_ms, c.timeout_ms);
 
     return c;
@@ -32,63 +32,63 @@ NodeConfig default_nodeconfig(void) {
 
 
 Node init_node(const NodeConfig* config) {    
-    Node n;
-    n.config = config; 
-	uuid_generate_random(n.id);
-    atomic_init(&n.hello_t_running, false);
-    n.peer_table = peer_discovery_init(config->timeout_ms);
+    Node receiver;
+    receiver.config = config; 
+	uuid_generate_random(receiver.id);
+    atomic_init(&receiver.hello_t_running, false);
+    receiver.peer_table = peer_discovery_init(config->timeout_ms);
 
-	init_h_socket(&n);
+	init_h_socket(&receiver);
 
-    print_uuid(n.id);
-    return n;
+    print_uuid(receiver.id);
+    return receiver;
 }
 
 
-void init_h_socket(Node *n){
+void init_h_socket(Node *receiver){
 
-	if((n->h_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
+	if((receiver->h_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
         exit_error("h_socket");  
 
 	int opt = 1;
-	if(setsockopt(n->h_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) < 0)
+	if(setsockopt(receiver->h_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) < 0)
 		exit_error("setsockopt SO_REUSEADDR");
 
 	// BIND
 	struct sockaddr_in addr = {0};
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(n->config->h_port);
+	addr.sin_port = htons(receiver->config->h_port);
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	
-	if(bind(n->h_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
+	if(bind(receiver->h_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
 		exit_error("h_socket bind"); 
 
 	// JOIN MULTICAST 
 	struct ip_mreq mreq;
-	inet_pton(AF_INET, n->config->h_multicast, &mreq.imr_multiaddr); 
+	inet_pton(AF_INET, receiver->config->h_multicast, &mreq.imr_multiaddr); 
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 	
-	if(setsockopt(n->h_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) 
+	if(setsockopt(receiver->h_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) 
 		exit_error("setsockopt IP_ADD_MEMBERSHIP");
 
-	printf("h_socket created successfully\n");
+	printf("h_socket created successfully\receiver");
 }
 
 
-void hello_handler(Node* n){
-	atomic_store(&n->hello_t_running, true);
+void hello_handler(Node* receiver){
+	atomic_store(&receiver->hello_t_running, true);
 
 	pthread_t h_send, h_recv; 
 
-	if(pthread_create(&h_send, NULL, send_hello, (void*)n) != 0)
+	if(pthread_create(&h_send, NULL, send_hello, (void*)receiver) != 0)
 		exit_error("pthread_create h_send");	
-	if(pthread_create(&h_recv, NULL, recv_hello, (void*)n) != 0)
+	if(pthread_create(&h_recv, NULL, recv_hello, (void*)receiver) != 0)
 		exit_error("pthread_create h_recv");
 	
 
 	/* TODO:
 	shutdown logic
-	unlock recv with shutdown(n->h_socket, SHUT_RDWR);
+	unlock recv with shutdown(receiver->h_socket, SHUT_RDWR);
 	*/
 
 
@@ -100,24 +100,24 @@ void hello_handler(Node* n){
 
 
 void* send_hello(void* arg){
-	Node *n = (Node*)arg;
+	Node *receiver = (Node*)arg;
 	Message msg; 	
     msg.type = HELLO;
-    memcpy(msg.node_id, n->id, sizeof(uuid_t));
+    memcpy(msg.node_id, receiver->id, sizeof(uuid_t));
     
     // sending multicast address 
     struct sockaddr_in mcast_addr = {0};
     mcast_addr.sin_family = AF_INET;
-    mcast_addr.sin_port = htons(n->config->h_port);
-    inet_pton(AF_INET, n->config->h_multicast, &mcast_addr.sin_addr);
+    mcast_addr.sin_port = htons(receiver->config->h_port);
+    inet_pton(AF_INET, receiver->config->h_multicast, &mcast_addr.sin_addr);
 
     // setting up the time spec (conversion from ms) 
     struct timespec ts; 
-    ts.tv_sec = n->config->heartbeat_ms / 1000;
-    ts.tv_nsec = (n->config->heartbeat_ms % 1000) * 1000000;
+    ts.tv_sec = receiver->config->heartbeat_ms / 1000;
+    ts.tv_nsec = (receiver->config->heartbeat_ms % 1000) * 1000000;
 
-	while(atomic_load(&n->hello_t_running)){
-        sendto(n->h_socket, &msg, sizeof(msg), 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
+	while(atomic_load(&receiver->hello_t_running)){
+        sendto(receiver->h_socket, &msg, sizeof(msg), 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
         // printf("HELLO: ");
         // print_uuid(msg.node_id);
 
@@ -129,20 +129,28 @@ void* send_hello(void* arg){
 
 
 void* recv_hello(void* arg){
-	Node *n = (Node*)arg;
+	Node *receiver = (Node*)arg; /*Ho cambiato il nome da n a receiver*/
     Message msg;
-        
-    while(atomic_load(&n->hello_t_running)){
+    
+    
+    while(atomic_load(&receiver->hello_t_running)){
         struct sockaddr_in src_addr;
         socklen_t addr_len;
 
-        ssize_t msg_size = recvfrom(n->h_socket, &msg, sizeof(msg), 0, 
+        ssize_t msg_size = recvfrom(receiver->h_socket, &msg, sizeof(msg), 0, 
                 (struct sockaddr*)&src_addr, &addr_len);
         if(msg_size == 0) {
             perror("recvfrom");
             continue;
         }
-        
+        /*ANDREA*/
+        int index = peer_add(receiver -> peer_table, msg.node_id);
+        if(index == -1){
+            printf("No peers available");
+            exit_error("No peers");
+            /*TODO: immplementare logica di aggiungere spazio nella lista o rimuovere peers inutili*/
+        }
+        /*------*/
         printf("HELLO from: ");
         print_uuid(msg.node_id);
     }
