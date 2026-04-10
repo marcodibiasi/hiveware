@@ -145,6 +145,11 @@ void* recv_hello(void* arg){
         }
         /*ANDREA*/
         int index = peer_add(receiver -> peer_table, msg.node_id);
+        /*
+        Qui controlliamo se il nodo è presente, ma peer_daemon potrebbe eliminare in questo istante il nodo. Bisognerebbe
+        aggiungere un controllo più robusto, con una variabile globale, ma questo aumenterebbe la complessità. Per adesso
+        va bene così ma in futuro non dimentichiamoci di implementare questo tipo di controllo
+        */
         if(index == -1){
             printf("No peers available");
             exit_error("No peers");
