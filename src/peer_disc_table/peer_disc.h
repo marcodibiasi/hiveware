@@ -19,13 +19,15 @@ typedef struct{
     struct timespec last_hello; // monotonic time since last_hello was sent
     double elapsed;             // delta time (now - last_hello); sake of visualization
 
-    pthread_mutex_t lock_empty; /*This mutex needs us to lock when we change is_empty's value*/
+    pthread_mutex_t mutex;      // protect the node
 }DiscNode;
 
 typedef struct{
     DiscNode Node[MAX_PEERS]; /*disc_node*/
     uint32_t timeout; 
     int n_nodes;
+
+    pthread_mutex_t table_mutex;
 }PeerDiscovery;
 
 void update_client_timer(DiscNode* Node); /*Updates timer for each client using cpu clocks*/
@@ -35,7 +37,8 @@ PeerDiscovery* peer_discovery_init(uint32_t timeout); /*Initialize peer_discover
 void peer_discovery_destroy(PeerDiscovery* peer_table); /*Destroy peer table*/
 int peer_add(PeerDiscovery* peer_table, uuid_t node_id); /*This function adds a peer in the discovery_table*/
 int peer_remove(PeerDiscovery* peer_table, uuid_t node_id); /*This function removes a peer in the discovery table*/
-void *peer_daemon(void* arg); /*This function removes peers that do not send the HELLO message*/
+void* peer_daemon(void* arg); /*This function removes peers that do not send the HELLO message*/
+void* print_daemon(void* arg);
 void print_peer_table(PeerDiscovery pt); 
 
 #endif

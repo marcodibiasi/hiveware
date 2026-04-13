@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <stdatomic.h>
 #include <uuid/uuid.h>
+#include <pthread.h>
 #include "peer_disc.h" 
 
 /*
@@ -28,14 +29,20 @@ typedef struct {
 } NodeConfig;
 
 typedef struct {
+    pthread_t peer_table_daemon, print_table_daemon;
+    pthread_t h_send, h_recv; 
+} NodeThreads;
+
+typedef struct {
     uuid_t id;  // uuid v4 128bit identifier
     PeerDiscovery* peer_table;    
+    NodeThreads nthreads;
 
-    const NodeConfig* config;
+    NodeConfig config; // Do not modify in threads
     int h_socket;
     int c_socket;
 
-    atomic_bool hello_t_running; 
+    atomic_bool running; 
 } Node;
 
 #pragma pack(push, 1)
@@ -46,9 +53,10 @@ typedef struct {
 #pragma pack(pop)
 
 NodeConfig default_nodeconfig(void);
-Node init_node(const NodeConfig* config);
+Node init_node(NodeConfig config);
+void start_node(Node* node);
+void stop_node(Node* node);
 void init_h_socket(Node* n);
-void hello_handler(Node* n);
 void* send_hello(void* arg);
 void* recv_hello(void* arg);
 

@@ -14,8 +14,9 @@
 #include "utils.h"
 #include "peer_disc.h"
 
+
 NodeConfig default_nodeconfig(void) {
-    NodeConfig c; 
+    NodeConfig c = {0}; 
     strcpy(c.h_multicast, "239.255.0.1");
     c.h_port = 50000;
     c.c_port = 50001;
@@ -25,27 +26,65 @@ NodeConfig default_nodeconfig(void) {
     printf("default nodeconfig created: \nh_port: %d" 
             "\nc_port: %d \nh_multicast: %s"
             "\nheartbeat_ms = %d \ntimeout_ms = %d\n",
-            c.h_port, c.c_port, c.h_multicast, c. heartbeat_ms, c.timeout_ms);
+            c.h_port, c.c_port, c.h_multicast, c.heartbeat_ms, c.timeout_ms);
     return c;
 }
 
 
-Node init_node(const NodeConfig* config) {    
-    Node receiver;
-    receiver.config = config; 
-	uuid_generate_random(receiver.id);
-    atomic_init(&receiver.hello_t_running, false);
-    receiver.peer_table = peer_discovery_init(config->timeout_ms);
+Node init_node(NodeConfig config) {    
+    Node node = {0};
+    node.config = config; 
+	uuid_generate_random(node.id);
+    atomic_init(&node.running, false);
+    node.peer_table = peer_discovery_init(node.config.timeout_ms);
 
-	init_h_socket(&receiver);
+	init_h_socket(&node);
 
-    print_uuid(receiver.id);
-    return receiver;
+    print_uuid(node.id);
+    return node;
+}
+
+
+void start_node(Node* node){
+    atomic_store(&node->running, true);
+
+    // DAEMONS
+    if(pthread_create(&node->nthreads.peer_table_daemon, NULL, peer_daemon, (void*)node) != 0)
+		exit_error("pthread_create peer_table_daemon");
+    if(pthread_create(&node->nthreads.print_table_daemon, NULL, print_daemon, (void*)node) != 0)
+		exit_error("pthread_create print_table_daemon");
+
+
+    // HELLO PROCESSES
+ 	if(pthread_create(&node->nthreads.h_send, NULL, send_hello, (void*)node) != 0)
+		exit_error("pthread_create h_send");	
+	if(pthread_create(&node->nthreads.h_recv, NULL, recv_hello, (void*)node) != 0)
+		exit_error("pthread_create h_recv");
+}
+
+
+void stop_node(Node* node){
+    atomic_store(&node->running, false);
+    shutdown(node->h_socket, SHUT_RDWR);
+
+    // DAEMONS
+    if(pthread_join(node->nthreads.peer_table_daemon, NULL) != 0)
+        exit_error("pthread_join peer_table_daemon");
+    if(pthread_join(node->nthreads.print_table_daemon, NULL) != 0)
+        exit_error("pthread_join print_table_daemon");
+
+
+    // HELLO PROCESSES
+	if(pthread_join(node->nthreads.h_send, NULL) != 0)
+		exit_error("pthread_join h_send");
+	if(pthread_join(node->nthreads.h_recv, NULL) != 0)
+		exit_error("pthread_join h_recv");
+
+    close(node->h_socket);
 }
 
 
 void init_h_socket(Node *receiver){
-
 	if((receiver->h_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
         exit_error("h_socket");  
 
@@ -58,7 +97,7 @@ void init_h_socket(Node *receiver){
 	// BIND
 	struct sockaddr_in addr = {0};
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(receiver->config->h_port);
+	addr.sin_port = htons(receiver->config.h_port);
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	
 	if(bind(receiver->h_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
@@ -66,37 +105,13 @@ void init_h_socket(Node *receiver){
 
 	// JOIN MULTICAST 
 	struct ip_mreq mreq;
-	inet_pton(AF_INET, receiver->config->h_multicast, &mreq.imr_multiaddr); 
+	inet_pton(AF_INET, receiver->config.h_multicast, &mreq.imr_multiaddr); 
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 	
 	if(setsockopt(receiver->h_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) 
 		exit_error("setsockopt IP_ADD_MEMBERSHIP");
 
 	printf("h_socket created successfully\n");
-}
-
-
-void hello_handler(Node* receiver){
-	atomic_store(&receiver->hello_t_running, true);
-
-	pthread_t h_send, h_recv; 
-
-	if(pthread_create(&h_send, NULL, send_hello, (void*)receiver) != 0)
-		exit_error("pthread_create h_send");	
-	if(pthread_create(&h_recv, NULL, recv_hello, (void*)receiver) != 0)
-		exit_error("pthread_create h_recv");
-	
-
-	/* TODO:
-	shutdown logic
-	unlock recv with shutdown(receiver->h_socket, SHUT_RDWR);
-	*/
-
-
-	if(pthread_join(h_send, NULL) != 0)
-		exit_error("pthread_join h_send");
-	if(pthread_join(h_recv, NULL) != 0)
-		exit_error("pthread_join h_recv");
 }
 
 
@@ -109,15 +124,15 @@ void* send_hello(void* arg){
     // sending multicast address 
     struct sockaddr_in mcast_addr = {0};
     mcast_addr.sin_family = AF_INET;
-    mcast_addr.sin_port = htons(receiver->config->h_port);
-    inet_pton(AF_INET, receiver->config->h_multicast, &mcast_addr.sin_addr);
+    mcast_addr.sin_port = htons(receiver->config.h_port);
+    inet_pton(AF_INET, receiver->config.h_multicast, &mcast_addr.sin_addr);
 
     // setting up the time spec (conversion from ms) 
     struct timespec ts; 
-    ts.tv_sec = receiver->config->heartbeat_ms / 1000;
-    ts.tv_nsec = (receiver->config->heartbeat_ms % 1000) * 1000000;
+    ts.tv_sec = receiver->config.heartbeat_ms / 1000;
+    ts.tv_nsec = (receiver->config.heartbeat_ms % 1000) * 1000000;
 
-	while(atomic_load(&receiver->hello_t_running)){
+	while(atomic_load(&receiver->running)){
         sendto(receiver->h_socket, &msg, sizeof(msg), 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
 
         nanosleep(&ts, NULL);
@@ -132,7 +147,7 @@ void* recv_hello(void* arg){
     Message msg;
     
     
-    while(atomic_load(&receiver->hello_t_running)){
+    while(atomic_load(&receiver->running)){
         struct sockaddr_in src_addr;
         socklen_t addr_len;
 
