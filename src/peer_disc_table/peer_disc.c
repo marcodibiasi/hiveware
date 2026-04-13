@@ -43,7 +43,7 @@ void peer_discovery_destroy(PeerDiscovery* peer_table){
 }
 
 int is_inside(PeerDiscovery* peer_table, uuid_t node_id){
-    
+
     for(int i = 0; i < MAX_PEERS; i++){
         pthread_mutex_lock(&peer_table->Node[i].lock_empty);
         
@@ -91,6 +91,9 @@ int peer_remove(PeerDiscovery* peer_table, uuid_t node_id){
     for(int i = 0; i < MAX_PEERS; i++){
         /*If we find an empty node, we just add the uuid and change the boolean flag to True*/
         if(memcmp(peer_table->Node[i].node_id, node_id, sizeof(uuid_t)) == 0) {
+            if(peer_table->Node[i].is_empty == true){
+                return 1; /*was already empty*/
+            }
             pthread_mutex_lock(&peer_table->Node[i].lock_empty);
             peer_table -> Node[i].is_empty = true;
             pthread_mutex_unlock(&peer_table->Node[i].lock_empty);
