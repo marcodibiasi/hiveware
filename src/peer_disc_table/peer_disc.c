@@ -42,6 +42,7 @@ void peer_discovery_destroy(PeerDiscovery* peer_table){
     free(peer_table);
 }
 
+
 int is_inside(PeerDiscovery* peer_table, uuid_t node_id){
 
     for(int i = 0; i < MAX_PEERS; i++){
@@ -56,6 +57,7 @@ int is_inside(PeerDiscovery* peer_table, uuid_t node_id){
     }
     return -1;
 }
+
 
 int peer_add(PeerDiscovery* peer_table, uuid_t node_id){
     if(!peer_table)
@@ -75,6 +77,8 @@ int peer_add(PeerDiscovery* peer_table, uuid_t node_id){
             peer_table->Node[i].is_empty = false;
             memcpy(peer_table->Node[i].node_id, node_id, sizeof(uuid_t));
             update_client_timer(&peer_table->Node[i]);
+
+            peer_table->n_nodes++;
             pthread_mutex_unlock(&peer_table -> Node[i].lock_empty);
             return i; // success
         }
@@ -96,6 +100,8 @@ int peer_remove(PeerDiscovery* peer_table, uuid_t node_id){
             }
             pthread_mutex_lock(&peer_table->Node[i].lock_empty);
             peer_table -> Node[i].is_empty = true;
+
+            peer_table->n_nodes--;
             pthread_mutex_unlock(&peer_table->Node[i].lock_empty);
             return 0; // Found 
         }
@@ -131,10 +137,14 @@ void* peer_daemon(void* arg){
             double elapsed =
                 (now.tv_sec - peer_table -> Node[i].last_hello.tv_sec) * 1e3 +
                 (now.tv_nsec - peer_table -> Node[i].last_hello.tv_nsec) / 1e6;
-            printf("sec_diff: %ld, nsec_diff: %ld, elapsed: %lf ms\n",
+
+            peer_table->Node[i].elapsed = elapsed;
+
+            /* printf("sec_diff: %ld, nsec_diff: %ld, elapsed: %lf ms\n",
             (long)(now.tv_sec - peer_table->Node[i].last_hello.tv_sec),
             (now.tv_nsec - peer_table->Node[i].last_hello.tv_nsec),
-                elapsed);
+                elapsed); */
+
 
             if (elapsed > peer_table->timeout){
                 printf("%lf",elapsed);
@@ -147,6 +157,34 @@ void* peer_daemon(void* arg){
 
             }
         }
+
+        print_peer_table(*peer_table);
     }
     return NULL;
+}
+
+
+void print_peer_table(PeerDiscovery pt){
+    printf("\n\n");
+    printf("+--------------------------------------+------------------+---------------------+\n");
+    printf("| NODE_ID                              | ADDRESS          | LAST_HELLO          |\n");
+    printf("+--------------------------------------+------------------+---------------------+\n");
+    for(int i=0; i < pt.n_nodes; i++) {
+        if(pt.Node[i].is_empty)
+            continue;
+
+        char uuid_str[37];
+        char addr_str[32];
+        // double last_hello = timespec_to_double(&pt.Node[i].last_hello);
+
+        uuid_unparse(pt.Node[i].node_id, uuid_str);
+        addr_to_string(&pt.Node[i].addr, addr_str);
+
+        printf("| %-36s | %-16s | %-17.3f s |\n",
+               uuid_str,
+               addr_str,
+               pt.Node[i].elapsed / 1e3);
+    }
+
+    printf("+--------------------------------------+------------------+---------------------+\n");
 }

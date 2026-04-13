@@ -21,12 +21,11 @@ NodeConfig default_nodeconfig(void) {
     c.c_port = 50001;
     c.heartbeat_ms = 2000;
     c.timeout_ms = 8000;
-
+    
     printf("default nodeconfig created: \nh_port: %d" 
             "\nc_port: %d \nh_multicast: %s"
-            "\nheartbeat_ms = %d \ntimeout_ms = %d\receiver",
+            "\nheartbeat_ms = %d \ntimeout_ms = %d\n",
             c.h_port, c.c_port, c.h_multicast, c. heartbeat_ms, c.timeout_ms);
-
     return c;
 }
 
@@ -53,6 +52,8 @@ void init_h_socket(Node *receiver){
 	int opt = 1;
 	if(setsockopt(receiver->h_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) < 0)
 		exit_error("setsockopt SO_REUSEADDR");
+    if(setsockopt(receiver->h_socket, SOL_SOCKET, SO_REUSEPORT, (char*)&opt, sizeof(opt)) < 0)
+        exit_error("setsockopt SO_REUSEPORT");
 
 	// BIND
 	struct sockaddr_in addr = {0};
@@ -71,7 +72,7 @@ void init_h_socket(Node *receiver){
 	if(setsockopt(receiver->h_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) 
 		exit_error("setsockopt IP_ADD_MEMBERSHIP");
 
-	printf("h_socket created successfully\receiver");
+	printf("h_socket created successfully\n");
 }
 
 
@@ -118,8 +119,6 @@ void* send_hello(void* arg){
 
 	while(atomic_load(&receiver->hello_t_running)){
         sendto(receiver->h_socket, &msg, sizeof(msg), 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
-        // printf("HELLO: ");
-        // print_uuid(msg.node_id);
 
         nanosleep(&ts, NULL);
 	}
@@ -144,7 +143,7 @@ void* recv_hello(void* arg){
             continue;
         }
         /*ANDREA*/
-        int index = peer_add(receiver -> peer_table, msg.node_id);
+        int index = peer_add(receiver->peer_table, msg.node_id);
         /*
         Qui controlliamo se il nodo è presente, ma peer_daemon potrebbe eliminare in questo istante il nodo. Bisognerebbe
         aggiungere un controllo più robusto, con una variabile globale, ma questo aumenterebbe la complessità. Per adesso
@@ -156,8 +155,13 @@ void* recv_hello(void* arg){
             /*TODO: immplementare logica di aggiungere spazio nella lista o rimuovere peers inutili*/
         }
         /*------*/
-        printf("HELLO from: ");
-        print_uuid(msg.node_id);
+
+        // DEBUG SECTION
+        // printing if the sending node is not the sending node
+        if(memcmp(receiver->id, msg.node_id, sizeof(msg.node_id)) != 0) { 
+            printf("HELLO from: ");
+            print_uuid(msg.node_id);
+        }
     }
 
 	return NULL;
