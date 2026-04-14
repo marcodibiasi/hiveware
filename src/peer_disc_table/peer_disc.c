@@ -8,6 +8,7 @@
 #include <time.h>
 #include <pthread.h>
 #include <stdatomic.h>
+#include <netinet/in.h>
 #include "peer_disc.h"
 #include "utils.h"
 #include "node.h"
@@ -34,38 +35,39 @@ void peer_discovery_destroy(PeerDiscovery* peer_table){
 }
 
 
+// REQUIRES: table_mutex locked
 int is_inside(PeerDiscovery* peer_table, uuid_t node_id){
-    pthread_mutex_lock(&peer_table->table_mutex);
-    
     for(int i = 0; i < peer_table->n_nodes; i++){
         if(memcmp(peer_table->Node[i].node_id, node_id, sizeof(uuid_t)) == 0)
             return i;
     }
-
-    pthread_mutex_unlock(&peer_table->table_mutex);
     return -1;
 }
 
 
-// TODO: pass and copy the ipv4 address
-int peer_add(PeerDiscovery* peer_table, uuid_t node_id){
+int peer_add(PeerDiscovery* peer_table, uuid_t node_id, struct sockaddr_in addr){
     if(!peer_table)
         exit_error("peer_table does not exist");
+    
 
+    pthread_mutex_lock(&peer_table->table_mutex);
     int index = is_inside(peer_table,node_id);
+    
     if(index != -1){
-        pthread_mutex_lock(&peer_table->table_mutex);
         update_client_timer(&peer_table->Node[index]);
         pthread_mutex_unlock(&peer_table->table_mutex);
         return index;
-    }
-    
+    } 
+
     // Add the new peer to the last slot available -> [n_nodes]
-    pthread_mutex_lock(&peer_table->table_mutex);
     int i = peer_table->n_nodes;
-    if(i >= MAX_PEERS) return -1;
+    if(i >= MAX_PEERS){
+        pthread_mutex_unlock(&peer_table->table_mutex);
+        return -1;
+    }
 
     memcpy(peer_table->Node[i].node_id, node_id, sizeof(uuid_t));
+    peer_table->Node[i].addr = addr;
     update_client_timer(&peer_table->Node[i]);
 
     peer_table->n_nodes++;
@@ -135,7 +137,6 @@ void* peer_daemon(void* arg){
                 (now.tv_sec - peer_table->Node[i].last_hello.tv_sec) * 1e3 +
                 (now.tv_nsec - peer_table->Node[i].last_hello.tv_nsec) / 1e6;
             
-            printf("%lf\n", elapsed);
             peer_table->Node[i].elapsed = elapsed;
 
             if (elapsed > peer_table->timeout){
@@ -159,7 +160,7 @@ void* print_daemon(void* arg){
     Node* node = (Node*)arg;
 
     while(atomic_load(&node->running)){
-        // printf("\033[H\033[J");
+        printf("\033[H\033[J");
 
         pthread_mutex_lock(&node->peer_table->table_mutex);
         print_peer_table(node->peer_table);
@@ -174,9 +175,9 @@ void* print_daemon(void* arg){
 
 void print_peer_table(PeerDiscovery* pt){
     printf("\n\n");
-    printf("+--------------------------------------+------------------+---------------------+\n");
-    printf("| NODE_ID                              | ADDRESS          | LAST_HELLO          |\n");
-    printf("+--------------------------------------+------------------+---------------------+\n");
+    printf("+--------------------------------------+---------------------+---------------------+\n");
+    printf("| NODE_ID                              | ADDRESS             | LAST_HELLO          |\n");
+    printf("+--------------------------------------+---------------------+---------------------+\n");
     for(int i=0; i < pt->n_nodes; i++) {
         char uuid_str[37];
         char addr_str[32];
@@ -185,11 +186,11 @@ void print_peer_table(PeerDiscovery* pt){
         uuid_unparse(pt->Node[i].node_id, uuid_str);
         addr_to_string(&pt->Node[i].addr, addr_str);
 
-        printf("| %-36s | %-16s | %-17.3f s |\n",
+        printf("| %-36s | %-16s | %-17.7lf s |\n",
                uuid_str,
                addr_str,
                pt->Node[i].elapsed / 1e3);
     }
 
-    printf("+--------------------------------------+------------------+---------------------+\n");
+    printf("+--------------------------------------+---------------------+---------------------+\n");
 }

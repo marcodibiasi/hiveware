@@ -148,17 +148,17 @@ void* recv_hello(void* arg){
     
     
     while(atomic_load(&receiver->running)){
-        struct sockaddr_in src_addr;
-        socklen_t addr_len;
+        struct sockaddr_in src_addr = {0};
+        socklen_t addr_len = sizeof(src_addr);
 
         ssize_t msg_size = recvfrom(receiver->h_socket, &msg, sizeof(msg), 0, 
                 (struct sockaddr*)&src_addr, &addr_len);
-        if(msg_size == 0) {
+        if(msg_size < 0) {
             perror("recvfrom");
             continue;
         }
         /*ANDREA*/
-        int index = peer_add(receiver->peer_table, msg.node_id);
+        int index = peer_add(receiver->peer_table, msg.node_id, src_addr);
         /*
         Qui controlliamo se il nodo è presente, ma peer_daemon potrebbe eliminare in questo istante il nodo. Bisognerebbe
         aggiungere un controllo più robusto, con una variabile globale, ma questo aumenterebbe la complessità. Per adesso
