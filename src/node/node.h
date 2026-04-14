@@ -53,6 +53,7 @@ typedef struct {
 #pragma pack(pop)
 
 NodeConfig default_nodeconfig(void);
+void load_or_create_uuid(uuid_t id);
 Node init_node(NodeConfig config);
 void start_node(Node* node);
 void stop_node(Node* node);

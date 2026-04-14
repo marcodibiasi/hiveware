@@ -34,7 +34,7 @@ NodeConfig default_nodeconfig(void) {
 Node init_node(NodeConfig config) {    
     Node node = {0};
     node.config = config; 
-	uuid_generate_random(node.id);
+	load_or_create_uuid(node.id);
     atomic_init(&node.running, false);
     node.peer_table = peer_discovery_init(node.config.timeout_ms);
 
@@ -42,6 +42,30 @@ Node init_node(NodeConfig config) {
 
     print_uuid(node.id);
     return node;
+}
+
+
+void load_or_create_uuid(uuid_t id){
+    FILE *f = fopen(".hiwaid", "r");
+
+    if(f){
+        char buffer[37];
+        if(fgets(buffer, sizeof(buffer), f)){
+            uuid_parse(buffer, id);
+        } else {
+            uuid_generate_random(id);
+        }
+        fclose(f);
+    } else {
+        uuid_generate_random(id);
+        f = fopen(".hiwaid", "w");
+        if(f){
+            char buffer[37];
+            uuid_unparse(id, buffer);
+            fprintf(f, "%s\n", buffer);
+            fclose(f);
+        }
+    }
 }
 
 
