@@ -9,6 +9,8 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(SRC
     src/main.c
     src/node/node.c
+    src/node/udp.c
+    src/node/tcp.c
     src/utils/utils.c
     src/peer_disc/peer_disc.c
     src/client_info/client_info.c

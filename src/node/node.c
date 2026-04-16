@@ -11,6 +11,8 @@
 #include <time.h>
 #include <uuid/uuid.h>
 #include "node.h"
+#include "udp.h"
+#include "tcp.h"
 #include "utils.h"
 #include "peer_disc.h"
 
@@ -42,30 +44,6 @@ Node init_node(NodeConfig config) {
 
     print_uuid(node.id);
     return node;
-}
-
-
-void load_or_create_uuid(uuid_t id){
-    FILE *f = fopen(".hiwaid", "r");
-
-    if(f){
-        char buffer[37];
-        if(fgets(buffer, sizeof(buffer), f)){
-            uuid_parse(buffer, id);
-        } else {
-            uuid_generate_random(id);
-        }
-        fclose(f);
-    } else {
-        uuid_generate_random(id);
-        f = fopen(".hiwaid", "w");
-        if(f){
-            char buffer[37];
-            uuid_unparse(id, buffer);
-            fprintf(f, "%s\n", buffer);
-            fclose(f);
-        }
-    }
 }
 
 
@@ -108,100 +86,25 @@ void stop_node(Node* node){
 }
 
 
-void init_h_socket(Node *receiver){
-	if((receiver->h_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
-        exit_error("h_socket");  
+void load_or_create_uuid(uuid_t id){
+    FILE *f = fopen(".hiwaid", "r");
 
-	int opt = 1;
-	if(setsockopt(receiver->h_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) < 0)
-		exit_error("setsockopt SO_REUSEADDR");
-    if(setsockopt(receiver->h_socket, SOL_SOCKET, SO_REUSEPORT, (char*)&opt, sizeof(opt)) < 0)
-        exit_error("setsockopt SO_REUSEPORT");
-
-	// BIND
-	struct sockaddr_in addr = {0};
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(receiver->config.h_port);
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	
-	if(bind(receiver->h_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
-		exit_error("h_socket bind"); 
-
-	// JOIN MULTICAST 
-	struct ip_mreq mreq;
-	inet_pton(AF_INET, receiver->config.h_multicast, &mreq.imr_multiaddr); 
-	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-	
-	if(setsockopt(receiver->h_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) 
-		exit_error("setsockopt IP_ADD_MEMBERSHIP");
-
-	printf("h_socket created successfully\n");
-}
-
-
-void* send_hello(void* arg){
-	Node *receiver = (Node*)arg;
-	Message msg; 	
-    msg.type = HELLO;
-    memcpy(msg.node_id, receiver->id, sizeof(uuid_t));
-    
-    // sending multicast address 
-    struct sockaddr_in mcast_addr = {0};
-    mcast_addr.sin_family = AF_INET;
-    mcast_addr.sin_port = htons(receiver->config.h_port);
-    inet_pton(AF_INET, receiver->config.h_multicast, &mcast_addr.sin_addr);
-
-    // setting up the time spec (conversion from ms) 
-    struct timespec ts; 
-    ts.tv_sec = receiver->config.heartbeat_ms / 1000;
-    ts.tv_nsec = (receiver->config.heartbeat_ms % 1000) * 1000000;
-
-	while(atomic_load(&receiver->running)){
-        sendto(receiver->h_socket, &msg, sizeof(msg), 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
-
-        nanosleep(&ts, NULL);
-	}
-
-	return NULL;
-}
-
-
-void* recv_hello(void* arg){
-	Node *receiver = (Node*)arg; /*Ho cambiato il nome da n a receiver*/
-    Message msg;
-    
-    
-    while(atomic_load(&receiver->running)){
-        struct sockaddr_in src_addr = {0};
-        socklen_t addr_len = sizeof(src_addr);
-
-        ssize_t msg_size = recvfrom(receiver->h_socket, &msg, sizeof(msg), 0, 
-                (struct sockaddr*)&src_addr, &addr_len);
-        if(msg_size < 0) {
-            perror("recvfrom");
-            continue;
+    if(f){
+        char buffer[37];
+        if(fgets(buffer, sizeof(buffer), f)){
+            uuid_parse(buffer, id);
+        } else {
+            uuid_generate_random(id);
         }
-        /*ANDREA*/
-        int index = peer_add(receiver->peer_table, msg.node_id, src_addr);
-        /*
-        Qui controlliamo se il nodo è presente, ma peer_daemon potrebbe eliminare in questo istante il nodo. Bisognerebbe
-        aggiungere un controllo più robusto, con una variabile globale, ma questo aumenterebbe la complessità. Per adesso
-        va bene così ma in futuro non dimentichiamoci di implementare questo tipo di controllo
-        */
-        if(index == -1){
-            printf("No peers available");
-            exit_error("No peers");
-            /*TODO: immplementare logica di aggiungere spazio nella lista o rimuovere peers inutili*/
-        }
-        /*------*/
-
-        // DEBUG SECTION
-        // printing if the sending node is not the sending node
-        if(memcmp(receiver->id, msg.node_id, sizeof(msg.node_id)) != 0) { 
-            printf("HELLO from: ");
-            print_uuid(msg.node_id);
+        fclose(f);
+    } else {
+        uuid_generate_random(id);
+        f = fopen(".hiwaid", "w");
+        if(f){
+            char buffer[37];
+            uuid_unparse(id, buffer);
+            fprintf(f, "%s\n", buffer);
+            fclose(f);
         }
     }
-
-	return NULL;
 }

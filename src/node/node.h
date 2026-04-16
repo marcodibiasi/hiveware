@@ -7,22 +7,31 @@
 #include <uuid/uuid.h>
 #include <pthread.h>
 #include "peer_disc.h" 
+#include "uv.h"
 
 /*
-Node stores the execution variables to setup before running the nodes. 
-h_port is a UDP port for the HELLO phase. 
-c_port is a TCP port to ensure the connection to the peers after the discovery. 
-h_multicast is a multicast ip used to send a HELLO message to the LAN. 
-*/
+ * Node configuration:
+ * - h_port:       UDP port for discovery (HELLO)
+ * - c_port:       TCP listening port (tasks/data)
+ * - h_multicast:  multicast address for HELLO
+ * - heartbeat_ms: interval between HELLO messages
+ * - timeout_ms:   peer removal timeout (peer_table)
+ */
+
+/*
+ * Messages:
+ * - HELLO: UDP multicast discovery message
+ *          includes node ID and uv_cpu_info_t
+ */
 
 typedef enum {
 	HELLO
 } Type;
 
 typedef struct {
-    char h_multicast[INET_ADDRSTRLEN];  // h_multicast is a multicast ip used to send a HELLO message to the LAN. 
-    uint16_t h_port; 			        // h_port is a UDP port for the HELLO phase. 
-	uint16_t c_port; 			        // c_port is a TCP port to ensure the connection to the peers after the discovery.
+    char h_multicast[INET_ADDRSTRLEN];  
+    uint16_t h_port; 			        
+	uint16_t c_port; 			        
 
     uint32_t heartbeat_ms;             
     uint32_t timeout_ms; 
@@ -33,7 +42,7 @@ typedef struct {
     pthread_t h_send, h_recv; 
 } NodeThreads;
 
-typedef struct {
+typedef struct Node{
     uuid_t id;  // uuid v4 128bit identifier
     PeerDiscovery* peer_table;    
     NodeThreads nthreads;
@@ -49,6 +58,7 @@ typedef struct {
 typedef struct {
     uuid_t node_id;
 	Type type;
+    uv_cpu_info_t* cpu_info;
 } Message;
 #pragma pack(pop)
 
@@ -57,8 +67,5 @@ void load_or_create_uuid(uuid_t id);
 Node init_node(NodeConfig config);
 void start_node(Node* node);
 void stop_node(Node* node);
-void init_h_socket(Node* n);
-void* send_hello(void* arg);
-void* recv_hello(void* arg);
 
 #endif // NODE_H
