@@ -1,4 +1,4 @@
-#include "client_getinfo.h"
+#include "client_info.h"
 
 uv_cpu_info_t* client_cpu_get_info(void){
 
