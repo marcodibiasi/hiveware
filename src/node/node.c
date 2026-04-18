@@ -11,123 +11,100 @@
 #include <time.h>
 #include <uuid/uuid.h>
 #include "node.h"
+#include "udp.h"
+#include "tcp.h"
 #include "utils.h"
+#include "peer_disc.h"
+
 
 NodeConfig default_nodeconfig(void) {
-    NodeConfig c; 
+    NodeConfig c = {0}; 
     strcpy(c.h_multicast, "239.255.0.1");
     c.h_port = 50000;
     c.c_port = 50001;
     c.heartbeat_ms = 2000;
     c.timeout_ms = 8000;
-
+    
     printf("default nodeconfig created: \nh_port: %d" 
             "\nc_port: %d \nh_multicast: %s"
             "\nheartbeat_ms = %d \ntimeout_ms = %d\n",
-            c.h_port, c.c_port, c.h_multicast, c. heartbeat_ms, c.timeout_ms);
-
+            c.h_port, c.c_port, c.h_multicast, c.heartbeat_ms, c.timeout_ms);
     return c;
 }
 
 
-Node init_node(const NodeConfig* config) {    
-    Node n;
-    n.config = config; 
-	uuid_generate_random(n.id);
-    atomic_init(&n.hello_t_running, false);
+Node init_node(NodeConfig config) {    
+    Node node = {0};
+    node.config = config; 
+	load_or_create_uuid(node.id);
+    atomic_init(&node.running, false);
+    node.peer_table = peer_discovery_init(node.config.timeout_ms);
 
-	init_h_socket(&n);
+	init_h_socket(&node);
 
-    print_uuid(n.id);
-    return n;
+    print_uuid(node.id);
+    return node;
 }
 
 
-void init_h_socket(Node *n){
+void start_node(Node* node){
+    atomic_store(&node->running, true);
 
-	if((n->h_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
-        exit_error("h_socket");  
-
-	int opt = 1;
-	if(setsockopt(n->h_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) < 0)
-		exit_error("setsockopt SO_REUSEADDR");
-
-	// BIND
-	struct sockaddr_in addr = {0};
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(n->config->h_port);
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	
-	if(bind(n->h_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
-		exit_error("h_socket bind"); 
-
-	// JOIN MULTICAST 
-	struct ip_mreq mreq;
-	inet_pton(AF_INET, n->config->h_multicast, &mreq.imr_multiaddr); 
-	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-	
-	if(setsockopt(n->h_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) 
-		exit_error("setsockopt IP_ADD_MEMBERSHIP");
-
-	printf("h_socket created successfully\n");
-}
+    // DAEMONS
+    if(pthread_create(&node->nthreads.peer_table_daemon, NULL, peer_daemon, (void*)node) != 0)
+		exit_error("pthread_create peer_table_daemon");
+    if(pthread_create(&node->nthreads.print_table_daemon, NULL, print_daemon, (void*)node) != 0)
+		exit_error("pthread_create print_table_daemon");
 
 
-void hello_handler(Node* n){
-	atomic_store(&n->hello_t_running, true);
-
-	pthread_t h_send, h_recv; 
-
-	if(pthread_create(&h_send, NULL, send_hello, (void*)n) != 0)
+    // HELLO PROCESSES
+ 	if(pthread_create(&node->nthreads.h_send, NULL, send_hello, (void*)node) != 0)
 		exit_error("pthread_create h_send");	
-	if(pthread_create(&h_recv, NULL, recv_hello, (void*)n) != 0)
+	if(pthread_create(&node->nthreads.h_recv, NULL, recv_hello, (void*)node) != 0)
 		exit_error("pthread_create h_recv");
-	
-
-	/* TODO:
-	shutdown logic
-	unlock recv with shutdown(n->h_socket, SHUT_RDWR);
-	*/
+}
 
 
-	if(pthread_join(h_send, NULL) != 0)
+void stop_node(Node* node){
+    atomic_store(&node->running, false);
+    shutdown(node->h_socket, SHUT_RDWR);
+
+    // DAEMONS
+    if(pthread_join(node->nthreads.peer_table_daemon, NULL) != 0)
+        exit_error("pthread_join peer_table_daemon");
+    if(pthread_join(node->nthreads.print_table_daemon, NULL) != 0)
+        exit_error("pthread_join print_table_daemon");
+
+
+    // HELLO PROCESSES
+	if(pthread_join(node->nthreads.h_send, NULL) != 0)
 		exit_error("pthread_join h_send");
-	if(pthread_join(h_recv, NULL) != 0)
+	if(pthread_join(node->nthreads.h_recv, NULL) != 0)
 		exit_error("pthread_join h_recv");
+
+    close(node->h_socket);
 }
 
 
-void* send_hello(void* arg){
-	Node *n = (Node*)arg;
-	Message msg; 	
-    msg.type = HELLO;
-    memcpy(msg.node_id, n->id, sizeof(uuid_t));
-    
-    // sending multicast address 
-    struct sockaddr_in mcast_addr = {0};
-    mcast_addr.sin_family = AF_INET;
-    mcast_addr.sin_port = htons(n->config->h_port);
-    inet_pton(AF_INET, n->config->h_multicast, &mcast_addr.sin_addr);
+void load_or_create_uuid(uuid_t id){
+    FILE *f = fopen(".hiwaid", "r");
 
-    // setting up the time spec (conversion from ms) 
-    struct timespec ts; 
-    ts.tv_sec = n->config->heartbeat_ms / 1000;
-    ts.tv_nsec = (n->config->heartbeat_ms % 1000) * 1000000;
-
-	while(atomic_load(&n->hello_t_running)){
-        sendto(n->h_socket, &msg, sizeof(msg), 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
-        printf("HELLO: ");
-        print_uuid(msg.node_id);
-
-        nanosleep(&ts, NULL);
-	}
-
-	return NULL;
-}
-
-
-void* recv_hello(void* arg){
-	Node *n = (Node*)arg;
-
-	return NULL;
+    if(f){
+        char buffer[37];
+        if(fgets(buffer, sizeof(buffer), f)){
+            uuid_parse(buffer, id);
+        } else {
+            uuid_generate_random(id);
+        }
+        fclose(f);
+    } else {
+        uuid_generate_random(id);
+        f = fopen(".hiwaid", "w");
+        if(f){
+            char buffer[37];
+            uuid_unparse(id, buffer);
+            fprintf(f, "%s\n", buffer);
+            fclose(f);
+        }
+    }
 }
