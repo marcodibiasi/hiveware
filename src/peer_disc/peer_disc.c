@@ -35,7 +35,9 @@ void peer_discovery_destroy(PeerDiscovery* peer_table){
 }
 
 
-// REQUIRES: table_mutex locked
+/* When this function is called
+ * REQUIRES: table_mutex locked
+*/
 int is_inside(PeerDiscovery* peer_table, uuid_t node_id){
     for(int i = 0; i < peer_table->n_nodes; i++){
         if(memcmp(peer_table->Node[i].node_id, node_id, sizeof(uuid_t)) == 0)
