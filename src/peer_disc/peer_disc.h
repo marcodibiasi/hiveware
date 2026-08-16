@@ -8,8 +8,18 @@
 #include <arpa/inet.h>
 #include <uuid/uuid.h>
 #include <time.h>
+#include "uv.h"
 
-#define MAX_PEERS 255
+#define MAX_PEERS 64
+
+
+typedef struct{
+    uint64_t user;
+    uint64_t sys;
+    uint64_t idle;
+    uint64_t nice;
+    uint64_t irq;
+} cpu_times_t;
 
 
 // This new version remove the local mutex appraoch for a global mutex 
@@ -23,6 +33,10 @@ typedef struct{
     uint16_t avg_mhz;
     uint8_t load_pct;           // carico corrente 0-100 (dall'ultimo HELLO)
     uint16_t c_port;            // porta TCP reale del peer (dall'ultimo HELLO)
+    
+    int cpu_count;
+    uv_cpu_info_t* cpu;                                 
+    cpu_times_t* delta_times;
 }DiscNode;
 
 typedef struct{
@@ -34,7 +48,6 @@ typedef struct{
 }PeerDiscovery;
 
 void update_client_timer(DiscNode* Node); /*Updates timer for each client using cpu clocks*/
-
 int is_inside(PeerDiscovery* peer_table, uuid_t node_id);
 PeerDiscovery* peer_discovery_init(uint32_t timeout); /*Initialize peer_discovery table*/
 void peer_discovery_destroy(PeerDiscovery* peer_table); /*Destroy peer table*/
