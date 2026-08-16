@@ -45,7 +45,8 @@ int is_inside(PeerDiscovery* peer_table, uuid_t node_id){
 }
 
 
-int peer_add(PeerDiscovery* peer_table, uuid_t node_id, struct sockaddr_in addr){
+int peer_add(PeerDiscovery* peer_table, uuid_t node_id, struct sockaddr_in addr,
+             uint16_t n_cores, uint16_t avg_mhz, uint8_t load_pct, uint16_t c_port){
     if(!peer_table)
         exit_error("peer_table does not exist");
     
@@ -54,6 +55,11 @@ int peer_add(PeerDiscovery* peer_table, uuid_t node_id, struct sockaddr_in addr)
     int index = is_inside(peer_table,node_id);
     
     if(index != -1){
+        // Peer gia' noto: aggiorna solo cio' che cambia ad ogni HELLO
+        peer_table->Node[index].n_cores = n_cores;
+        peer_table->Node[index].avg_mhz = avg_mhz;
+        peer_table->Node[index].load_pct = load_pct;
+        peer_table->Node[index].c_port = c_port;
         update_client_timer(&peer_table->Node[index]);
         pthread_mutex_unlock(&peer_table->table_mutex);
         return index;
@@ -68,6 +74,10 @@ int peer_add(PeerDiscovery* peer_table, uuid_t node_id, struct sockaddr_in addr)
 
     memcpy(peer_table->Node[i].node_id, node_id, sizeof(uuid_t));
     peer_table->Node[i].addr = addr;
+    peer_table->Node[i].n_cores = n_cores;
+    peer_table->Node[i].avg_mhz = avg_mhz;
+    peer_table->Node[i].load_pct = load_pct;
+    peer_table->Node[i].c_port = c_port;
     update_client_timer(&peer_table->Node[i]);
 
     peer_table->n_nodes++;
@@ -175,9 +185,9 @@ void* print_daemon(void* arg){
 
 void print_peer_table(PeerDiscovery* pt){
     printf("\n\n");
-    printf("+--------------------------------------+---------------------+---------------------+\n");
-    printf("| NODE_ID                              | ADDRESS             | LAST_HELLO          |\n");
-    printf("+--------------------------------------+---------------------+---------------------+\n");
+    printf("+--------------------------------------+---------------------+---------------------+-------+---------+------+-------+\n");
+    printf("| NODE_ID                              | ADDRESS             | LAST_HELLO          | CORES | AVG_MHZ | LOAD | TCP_P |\n");
+    printf("+--------------------------------------+---------------------+---------------------+-------+---------+------+-------+\n");
     for(int i=0; i < pt->n_nodes; i++) {
         char uuid_str[37];
         char addr_str[32];
@@ -186,11 +196,15 @@ void print_peer_table(PeerDiscovery* pt){
         uuid_unparse(pt->Node[i].node_id, uuid_str);
         addr_to_string(&pt->Node[i].addr, addr_str);
 
-        printf("| %-36s | %-16s | %-17.7lf s |\n",
+        printf("| %-36s | %-16s | %-17.7lf s | %-5u | %-7u | %3u%% | %-5u |\n",
                uuid_str,
                addr_str,
-               pt->Node[i].elapsed / 1e3);
+               pt->Node[i].elapsed / 1e3,
+               pt->Node[i].n_cores,
+               pt->Node[i].avg_mhz,
+               pt->Node[i].load_pct,
+               pt->Node[i].c_port);
     }
 
-    printf("+--------------------------------------+---------------------+---------------------+\n");
+    printf("+--------------------------------------+---------------------+---------------------+-------+---------+------+-------+\n");
 }

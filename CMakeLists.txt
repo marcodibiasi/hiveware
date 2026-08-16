@@ -14,6 +14,8 @@ set(SRC
     src/utils/utils.c
     src/peer_disc/peer_disc.c
     src/client_info/client_info.c
+    src/Job/job.c
+    src/Job/job_registry.c
 )
 
 
@@ -28,6 +30,7 @@ target_include_directories(hiwa PRIVATE
     src/utils
     src/peer_disc
     src/client_info
+    src/job
 )
 
 

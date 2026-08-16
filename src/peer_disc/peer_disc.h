@@ -18,6 +18,11 @@ typedef struct{
     struct sockaddr_in addr;    // Node address
     struct timespec last_hello; // monotonic time since last_hello was sent
     double elapsed;             // delta time (now - last_hello); sake of visualization
+
+    uint16_t n_cores;           // capacita' (quasi statica, dall'ultimo HELLO)
+    uint16_t avg_mhz;
+    uint8_t load_pct;           // carico corrente 0-100 (dall'ultimo HELLO)
+    uint16_t c_port;            // porta TCP reale del peer (dall'ultimo HELLO)
 }DiscNode;
 
 typedef struct{
@@ -33,7 +38,8 @@ void update_client_timer(DiscNode* Node); /*Updates timer for each client using 
 int is_inside(PeerDiscovery* peer_table, uuid_t node_id);
 PeerDiscovery* peer_discovery_init(uint32_t timeout); /*Initialize peer_discovery table*/
 void peer_discovery_destroy(PeerDiscovery* peer_table); /*Destroy peer table*/
-int peer_add(PeerDiscovery* peer_table, uuid_t node_id, struct sockaddr_in addr); /*This function adds a peer in the discovery_table*/
+int peer_add(PeerDiscovery* peer_table, uuid_t node_id, struct sockaddr_in addr,
+             uint16_t n_cores, uint16_t avg_mhz, uint8_t load_pct, uint16_t c_port); /*This function adds a peer in the discovery_table, or aggiorna capacita'/carico/porta se gia' presente*/
 int peer_remove(PeerDiscovery* peer_table, uuid_t node_id); /*This function removes a peer in the discovery table*/
 void peer_remove_index(PeerDiscovery* peer_table, int index);
 void* peer_daemon(void* arg); /*This function removes peers that do not send the HELLO message*/

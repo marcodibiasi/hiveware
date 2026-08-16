@@ -40,9 +40,17 @@ Node init_node(NodeConfig config) {
     atomic_init(&node.running, false);
     node.peer_table = peer_discovery_init(node.config.timeout_ms);
 
+    cpu_capacity(&node.n_cores, &node.avg_mhz);
+    node.last_cpu_snapshot = cpu_times_snapshot();
+
+    node.job_registry = job_registry_init();
+    node.task_executor = NULL; // impostare esplicitamente prima di start_node se si vuole eseguire task ricevuti
+
 	init_h_socket(&node);
+    init_c_socket(&node);
 
     print_uuid(node.id);
+    printf("capacity: %d cores @ %d MHz (avg)\n", node.n_cores, node.avg_mhz);
     return node;
 }
 
@@ -62,12 +70,17 @@ void start_node(Node* node){
 		exit_error("pthread_create h_send");	
 	if(pthread_create(&node->nthreads.h_recv, NULL, recv_hello, (void*)node) != 0)
 		exit_error("pthread_create h_recv");
+
+    // TCP TASK LAYER
+    if(pthread_create(&node->nthreads.tcp_accept, NULL, tcp_accept_daemon, (void*)node) != 0)
+        exit_error("pthread_create tcp_accept");
 }
 
 
 void stop_node(Node* node){
     atomic_store(&node->running, false);
     shutdown(node->h_socket, SHUT_RDWR);
+    shutdown(node->c_socket, SHUT_RDWR); // sblocca accept() nel tcp_accept_daemon
 
     // DAEMONS
     if(pthread_join(node->nthreads.peer_table_daemon, NULL) != 0)
@@ -82,7 +95,16 @@ void stop_node(Node* node){
 	if(pthread_join(node->nthreads.h_recv, NULL) != 0)
 		exit_error("pthread_join h_recv");
 
+    // TCP TASK LAYER
+    if(pthread_join(node->nthreads.tcp_accept, NULL) != 0)
+        exit_error("pthread_join tcp_accept");
+    // NOTA: le connessioni gia' accettate (tcp_conn_handler, thread detached)
+    // non vengono joinate qui: si chiudono da sole al prossimo controllo di
+    // node->running o alla disconnessione del peer.
+
     close(node->h_socket);
+    close(node->c_socket);
+    job_registry_destroy(node->job_registry); // non distrugge i Job, solo il registro (vedi job_registry.h)
 }
 
 

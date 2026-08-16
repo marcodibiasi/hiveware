@@ -51,6 +51,9 @@ void* send_hello(void* arg){
 	Message msg; 	
     msg.type = HELLO;
     memcpy(msg.node_id, receiver->id, sizeof(uuid_t));
+    msg.n_cores = receiver->n_cores;
+    msg.avg_mhz = receiver->avg_mhz;
+    msg.c_port = receiver->config.c_port;
     
     // sending multicast address 
     struct sockaddr_in mcast_addr = {0};
@@ -64,6 +67,11 @@ void* send_hello(void* arg){
     ts.tv_nsec = (receiver->config.heartbeat_ms % 1000) * 1000000;
 
 	while(atomic_load(&receiver->running)){
+        // carico = delta cpu_times rispetto all'ultimo HELLO inviato
+        CpuTimesSnapshot current = cpu_times_snapshot();
+        msg.load_pct = cpu_load_pct(receiver->last_cpu_snapshot, current);
+        receiver->last_cpu_snapshot = current;
+
         sendto(receiver->h_socket, &msg, sizeof(msg), 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
 
         nanosleep(&ts, NULL);
@@ -97,7 +105,8 @@ void* recv_hello(void* arg){
             continue;
         */
 
-        int index = peer_add(receiver->peer_table, msg.node_id, src_addr);
+        int index = peer_add(receiver->peer_table, msg.node_id, src_addr,
+                              msg.n_cores, msg.avg_mhz, msg.load_pct, msg.c_port);
 
         if(index == -1)
             exit_error("peer_table out of slots");

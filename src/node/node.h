@@ -7,6 +7,9 @@
 #include <uuid/uuid.h>
 #include <pthread.h>
 #include "peer_disc.h" 
+#include "client_info.h"
+#include "job_registry.h"
+#include "tcp.h"
 #include "uv.h"
 
 /*
@@ -40,6 +43,7 @@ typedef struct {
 typedef struct {
     pthread_t peer_table_daemon, print_table_daemon;
     pthread_t h_send, h_recv; 
+    pthread_t tcp_accept;
 } NodeThreads;
 
 typedef struct Node{
@@ -51,14 +55,36 @@ typedef struct Node{
     int h_socket;
     int c_socket;
 
+    // Capacita' locale (calcolata una volta all'avvio) e ultimo
+    // campionamento dei cpu_times, usato da send_hello per calcolare
+    // il delta di carico da allegare al prossimo HELLO. Toccato solo
+    // dal thread h_send: nessuna sincronizzazione necessaria.
+    uint16_t n_cores;
+    uint16_t avg_mhz;
+    CpuTimesSnapshot last_cpu_snapshot;
+
+    JobRegistry* job_registry;   // job attivi di cui questo nodo e' coordinator
+    TaskExecutor task_executor;  // funzione che esegue i task ricevuti; NULL = rifiuta tutto (vedi tcp.h)
+
     atomic_bool running; 
 } Node;
 
+/*
+ * HELLO piggyback: ogni nodo allega un sommario delle proprie risorse
+ * e la propria porta TCP reale (necessaria perche' tcp_connect_to_peer
+ * non puo' piu' assumere che tutti i nodi usino la stessa c_port).
+ * - n_cores/avg_mhz: capacita', quasi statica (ricalcolata di rado)
+ * - load_pct:        carico corrente 0-100, ricalcolato ad ogni HELLO
+ *   come delta dei cpu_times tra due invii successivi (vedi udp.c)
+ */
 #pragma pack(push, 1)
 typedef struct {
     uuid_t node_id;
 	Type type;
-    uv_cpu_info_t* cpu_info;
+    uint16_t n_cores;
+    uint16_t avg_mhz;
+    uint8_t load_pct;
+    uint16_t c_port; // porta TCP su cui questo nodo ascolta davvero
 } Message;
 #pragma pack(pop)
 
